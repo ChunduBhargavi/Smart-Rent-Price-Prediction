@@ -82,9 +82,9 @@ for col in encoder_keys:
 
 # --- Scale numeric columns ---
 num_cols = scaler.feature_names_in_
-# Fill missing numeric columns with realistic default if not present
 for col in num_cols:
     if col not in input_df.columns:
+        # Use realistic default if numeric column missing
         input_df[col] = numeric_defaults.get(col, 0)
 input_df[num_cols] = scaler.transform(input_df[num_cols])
 
@@ -95,6 +95,10 @@ for col in model_cols:
         input_df[col] = 0
 input_df = input_df[model_cols]
 
+# --- Debug: show input to model ---
+st.subheader("Debug: Model input features")
+st.dataframe(input_df)
+
 # --- Predict ---
 if st.button("Predict Rent"):
     try:
@@ -104,8 +108,8 @@ if st.button("Predict Rent"):
         if hasattr(model, 'log_transform') and model.log_transform:
             pred = np.exp(pred)
         
-        # Clamp negative predictions to 0
-        pred = [max(0, p) for p in pred]
+        # Clamp negative predictions to a minimum realistic rent (e.g., 1000)
+        pred = [max(1000, p) for p in pred]
         
         st.success(f"Predicted Monthly Rent: ₹{pred[0]:,.2f}")
     except Exception as e:
