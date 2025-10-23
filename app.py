@@ -5,7 +5,9 @@ import os
 from datetime import datetime
 import numpy as np
 
-# --- Load model, encoders, scaler ---
+# -------------------------
+# Load model, encoders, scaler
+# -------------------------
 @st.cache_resource
 def load_model_objects():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -22,7 +24,9 @@ def load_model_objects():
 
 model, label_encoders, scaler = load_model_objects()
 
-# --- Streamlit UI ---
+# -------------------------
+# Streamlit UI
+# -------------------------
 st.title("Smart Rent Price Prediction")
 st.write("Enter property details and click 'Predict Rent'.")
 
@@ -47,7 +51,7 @@ numeric_defaults = {
 for col, default in numeric_defaults.items():
     user_inputs[col] = st.number_input(col.replace("_", " "), min_value=0, value=default)
 
-# Negotiable
+# Negotiable checkbox
 user_inputs['Negotiable'] = 1 if st.checkbox("Negotiable", value=True) else 0
 
 # Activation date
@@ -56,49 +60,53 @@ user_inputs['Year'] = activation_date.year
 user_inputs['Month'] = activation_date.month
 user_inputs['Day'] = activation_date.day
 
-# --- Prepare input DataFrame ---
+# -------------------------
+# Prepare input DataFrame
+# -------------------------
 def prepare_input_df():
     df = pd.DataFrame([user_inputs])
     
-    # Encode categoricals
+    # Encode categorical columns
     for col in encoder_keys:
         le = label_encoders[col]
         try:
             df[col] = le.transform(df[col])
         except:
-            df[col] = 0  # fallback
+            df[col] = 0  # fallback for unseen categories
     
-    # Fill missing numeric columns
+    # Fill missing numeric columns expected by scaler
     for col in scaler.feature_names_in_:
         if col not in df.columns:
             df[col] = numeric_defaults.get(col, 0)
     
-    # Scale numeric
+    # Apply scaler
     df[scaler.feature_names_in_] = scaler.transform(df[scaler.feature_names_in_])
     
-    # Align with model columns
+    # Align columns with model
     for col in model.feature_names_in_:
         if col not in df.columns:
             df[col] = 0
     df = df[model.feature_names_in_]
+    
     return df
 
-# --- Predict Rent on button click ---
+# -------------------------
+# Predict Rent
+# -------------------------
 if st.button("Predict Rent"):
     input_df = prepare_input_df()
     try:
         # Predict log1p(rent)
         pred_log1p = model.predict(input_df)
         
-        # Convert back to actual rent
+        # Convert back from log1p
         pred_rent = np.expm1(pred_log1p)
         
-        # Clip negative outputs from numeric noise
+        # Clip tiny negative values caused by numeric noise
         pred_rent = np.clip(pred_rent, 0, None)
         
-        # Round for display
         pred_value = round(pred_rent[0])
-        
         st.success(f"Predicted Monthly Rent: ₹{pred_value:,}")
+        
     except Exception as e:
         st.error(f"Prediction failed: {e}")
