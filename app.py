@@ -1,130 +1,75 @@
 import streamlit as st
 import pandas as pd
-import pickle
-from datetime import datetime
+import joblib
+import os
 
-# --- Load model and encoder ---
+# --- Load model, label encoders, and scaler ---
 @st.cache_resource
-def load_model_and_encoder():
-    with open('regression_model.pkl', 'rb') as f:
-        model = pickle.load(f)
-    with open('ordinal_encoder.pkl', 'rb') as f:
-        encoder = pickle.load(f)
-    return model, encoder
+def load_model_objects():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    
+    model_path = os.path.join(BASE_DIR, 'final_rent_model.joblib')
+    encoder_path = os.path.join(BASE_DIR, 'label_encoders.joblib')
+    scaler_path = os.path.join(BASE_DIR, 'scaler.joblib')
+    
+    model = joblib.load(model_path)
+    label_encoders = joblib.load(encoder_path)
+    scaler = joblib.load(scaler_path)
+    
+    return model, label_encoders, scaler
 
-model, encoder = load_model_and_encoder()
+model, label_encoders, scaler = load_model_objects()
 
-# --- Predefined categories ---
-type_options = ['BHK1', 'BHK2', 'BHK3', 'BHK4', 'BHK4PLUS', 'RK1', 'PENTHOUSE']
-lease_type_options = ['ANYONE', 'FAMILY', 'BACHELOR', 'COMPANY']
-furnishing_options = ['SEMI_FURNISHED', 'FULLY_FURNISHED', 'NOT_FURNISHED']
-parking_options = ['BOTH', 'BIKE', 'CAR', 'NONE']
-facing_options = ['E', 'NE', 'N', 'SE', 'NW', 'S', 'W', 'SW']
-water_supply_options = ['CORP_BORE', 'CORPORATION', 'BOREWELL']
-building_type_options = ['AP', 'IF', 'IH', 'GC']
+# --- Streamlit UI ---
+st.title("Smart Rent Price Prediction")
+st.write("Enter property details below to predict the monthly rent.")
 
-# --- Amenities list ---
-amenities_list = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL', 
-                  'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH', 
-                  'STP', 'HK', 'PB', 'VP']
+# User inputs
+city = st.text_input("City Name", "Bangalore")
+area_type = st.selectbox("Area Type", ["Super Area", "Carpet Area", "Built Area"])
+bhk = st.number_input("BHK (Bedrooms)", 1, 10, 2)
+size = st.number_input("Size (sq.ft)", 100, 5000, 1000)
+furnishing = st.selectbox("Furnishing Status", ["Furnished", "Semi-Furnished", "Unfurnished"])
+tenant = st.selectbox("Tenant Preferred", ["Bachelors", "Family", "Company"])
+bathroom = st.number_input("Number of Bathrooms", 1, 5, 2)
 
-# --- Streamlit app ---
-st.title("Rental Property Price Predictor")
+# Create input DataFrame
+input_df = pd.DataFrame({
+    'City': [city],
+    'Area Type': [area_type],
+    'BHK': [bhk],
+    'Size': [size],
+    'Furnishing Status': [furnishing],
+    'Tenant Preferred': [tenant],
+    'Bathroom': [bathroom]
+})
 
-with st.form(key='rental_form'):
-    # Date
-    activation_date = st.date_input("Activation Date", value=datetime.today())
-    
-    # Location
-    latitude = st.number_input("Latitude", value=12.93, format="%.6f")
-    longitude = st.number_input("Longitude", value=77.67, format="%.6f")
-    
-    # Categorical
-    type_ = st.selectbox("Type", type_options)
-    lease_type = st.selectbox("Lease Type", lease_type_options)
-    furnishing = st.selectbox("Furnishing", furnishing_options)
-    parking = st.selectbox("Parking", parking_options)
-    facing = st.selectbox("Facing", facing_options)
-    water_supply = st.selectbox("Water Supply", water_supply_options)
-    building_type = st.selectbox("Building Type", building_type_options)
-    
-    # Numeric/Boolean
-    property_size = st.number_input("Property Size (sq ft)", min_value=100, value=1400)
-    property_age = st.number_input("Property Age (years)", min_value=0, value=4)
-    bathroom = st.number_input("Bathrooms", min_value=1, value=2)
-    cup_board = st.number_input("Cupboards", min_value=0, value=2)
-    floor = st.number_input("Floor", min_value=0, value=3)
-    total_floor = st.number_input("Total Floors", min_value=1, value=4)
-    balconies = st.number_input("Balconies", min_value=0, value=2)
-    negotiable = st.checkbox("Negotiable", value=True)
-    
-    # Amenities
-    st.subheader("Amenities")
-    amenities_dict = {}
-    for amen in amenities_list:
-        amenities_dict[amen] = 1 if st.checkbox(amen, value=False) else 0
-    
-    submit = st.form_submit_button("Predict Rental Price")
-
-if submit:
-    # --- Prepare user DataFrame ---
-    year = activation_date.year
-    month = activation_date.month
-    day = activation_date.day
-    
-    user_dict = {
-        'month': month,
-        'day': day,
-        'year': year,
-        'latitude': float(latitude),
-        'longitude': float(longitude),
-        'type': type_,
-        'lease_type': lease_type,
-        'furnishing': furnishing,
-        'parking': parking,
-        'facing': facing,
-        'water_supply': water_supply,
-        'building_type': building_type,
-        'property_size': float(property_size),
-        'property_age': float(property_age),
-        'bathroom': float(bathroom),
-        'cup_board': float(cup_board),
-        'floor': float(floor),
-        'total_floor': float(total_floor),
-        'balconies': float(balconies),
-        'negotiable': 1 if negotiable else 0,
-        # main amenities
-        'gym': amenities_dict['GYM'],
-        'lift': amenities_dict['LIFT'],
-        'swimming_pool': amenities_dict['POOL']
-    }
-    
-    user_df = pd.DataFrame([user_dict])
-    
-    # --- Encode categorical features safely ---
-    cat_cols = ['type', 'lease_type', 'furnishing', 'parking', 'facing', 'water_supply', 'building_type']
-    for col in cat_cols:
+# Encode categorical columns safely
+for col, le in label_encoders.items():
+    if col in input_df.columns:
         try:
-            user_df[[col]] = encoder.transform(user_df[[col]])
+            input_df[col] = le.transform(input_df[col])
         except ValueError:
-            user_df[col] = -1  # fallback for unknown categories
-    
-    # --- Add remaining amenities without duplicates ---
-    for amen in amenities_list:
-        col_name = amen.lower()
-        if col_name not in ['gym', 'lift', 'swimming_pool']:
-            user_df[col_name] = amenities_dict[amen]
-    
-    # --- Ensure columns match model ---
-    model_cols = model.feature_names_in_
-    for col in model_cols:
-        if col not in user_df.columns:
-            user_df[col] = 0  # default value
-    user_df = user_df[model_cols]  # reorder
-    
-    # --- Predict ---
+            input_df[col] = 0  # fallback for unseen categories
+
+# Scale numeric columns
+num_cols = scaler.feature_names_in_
+for col in num_cols:
+    if col not in input_df.columns:
+        input_df[col] = 0
+input_df[num_cols] = scaler.transform(input_df[num_cols])
+
+# Ensure columns match model
+model_cols = model.feature_names_in_
+for col in model_cols:
+    if col not in input_df.columns:
+        input_df[col] = 0
+input_df = input_df[model_cols]  # reorder
+
+# Predict
+if st.button("Predict Rent"):
     try:
-        prediction = model.predict(user_df)
-        st.success(f"Predicted Rental Price: ₹{prediction[0]:,.2f}")
+        pred = model.predict(input_df)
+        st.success(f"Predicted Monthly Rent: ₹{pred[0]:,.2f}")
     except Exception as e:
         st.error(f"Prediction failed: {e}")
