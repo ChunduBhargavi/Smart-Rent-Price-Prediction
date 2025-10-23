@@ -1,3 +1,4 @@
+!pip install joblib
 import streamlit as st
 import pandas as pd
 import joblib
@@ -6,7 +7,7 @@ model = joblib.load("final_rent_model.joblib")
 label_encoders = joblib.load("label_encoders.joblib")
 scaler = joblib.load("scaler.joblib")
 
-st.title("🏠 Smart Rent Price Prediction")
+st.title("Smart Rent Price Prediction")
 st.write("Enter property details below to predict the monthly rent.")
 
 city = st.text_input("City Name", "Bangalore")
@@ -39,5 +40,5 @@ input_df[num_cols] = scaler.transform(input_df[num_cols])
 
 if st.button("Predict Rent"):
     pred = model.predict(input_df)
-    st.success(f"🏡 Predicted Monthly Rent: ₹{pred[0]:,.2f}")
+    st.success(f"Predicted Monthly Rent: ₹{pred[0]:,.2f}")
 
