@@ -24,7 +24,7 @@ model, label_encoders, scaler = load_model_objects()
 
 # --- Streamlit UI ---
 st.title("Smart Rent Price Prediction")
-st.write("Enter property details to predict monthly rent.")
+st.write("Enter property details to predict monthly rent dynamically.")
 
 # --- Categorical inputs ---
 encoder_keys = list(label_encoders.keys())
@@ -58,7 +58,7 @@ user_inputs['Year'] = activation_date.year
 user_inputs['Month'] = activation_date.month
 user_inputs['Day'] = activation_date.day
 
-# --- Prepare DataFrame ---
+# --- Prepare DataFrame for prediction ---
 input_df = pd.DataFrame([user_inputs])
 
 # --- Encode categorical variables ---
@@ -78,18 +78,21 @@ for col in model.feature_names_in_:
         input_df[col] = 0
 input_df = input_df[model.feature_names_in_]
 
-# --- Predict Rent ---
-if st.button("Predict Rent"):
+# --- Dynamic Prediction ---
+# Using a function so prediction updates whenever inputs change
+def predict_rent(df):
     try:
-        pred = model.predict(input_df)
-        
-        # Handle log-transform if needed
+        pred = model.predict(df)
+        # Handle log-transform if model was trained on log(rent)
         if hasattr(model, 'log_transform') and model.log_transform:
             pred = np.exp(pred)
-        
         # Clamp very low predictions
         pred = [max(1000, p) for p in pred]
-        
-        st.success(f"Predicted Monthly Rent: ₹{pred[0]:,.2f}")
+        return pred[0]
     except Exception as e:
         st.error(f"Prediction failed: {e}")
+        return None
+
+predicted_rent = predict_rent(input_df)
+if predicted_rent is not None:
+    st.success(f"Predicted Monthly Rent: ₹{predicted_rent:,.2f}")
