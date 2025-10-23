@@ -97,7 +97,7 @@ if submit:
         pred_log1p = model.predict(input_df)
         # Convert from log1p if model uses it
         pred_rent = np.expm1(pred_log1p)
-        pred_rent = np.clip(pred_rent, 0, None)  # avoid negative/zero
+        pred_rent = np.clip(pred_rent, 10000, None)  # avoid negative/zero
         
         st.success(f"Predicted Monthly Rent: ₹{round(pred_rent[0]):,}")
     except Exception as e:
