@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 import os
+from datetime import datetime
 
 # --- Load model, label encoders, and scaler ---
 @st.cache_resource
@@ -25,6 +26,7 @@ st.title("Smart Rent Price Prediction")
 st.write("Enter property details below to predict the monthly rent.")
 
 # User inputs
+activation_date = st.date_input("Activation Date", value=datetime.today())
 city = st.text_input("City Name", "Bangalore")
 area_type = st.selectbox("Area Type", ["Super Area", "Carpet Area", "Built Area"])
 bhk = st.number_input("BHK (Bedrooms)", 1, 10, 2)
@@ -33,40 +35,81 @@ furnishing = st.selectbox("Furnishing Status", ["Furnished", "Semi-Furnished", "
 tenant = st.selectbox("Tenant Preferred", ["Bachelors", "Family", "Company"])
 bathroom = st.number_input("Number of Bathrooms", 1, 5, 2)
 
-# Create input DataFrame
-input_df = pd.DataFrame({
-    'City': [city],
-    'Area Type': [area_type],
-    'BHK': [bhk],
-    'Size': [size],
-    'Furnishing Status': [furnishing],
-    'Tenant Preferred': [tenant],
-    'Bathroom': [bathroom]
-})
+# Amenities list
+amenities_list = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL',
+                  'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH',
+                  'STP', 'HK', 'PB', 'VP']
 
-# Encode categorical columns safely
-for col, le in label_encoders.items():
-    if col in input_df.columns:
-        try:
-            input_df[col] = le.transform(input_df[col])
-        except ValueError:
-            input_df[col] = 0  # fallback for unseen categories
+st.subheader("Amenities")
+amenities_dict = {}
+for amen in amenities_list:
+    amenities_dict[amen] = 1 if st.checkbox(amen, value=False) else 0
 
-# Scale numeric columns
+# Other numeric inputs
+property_age = st.number_input("Property Age (years)", min_value=0, value=4)
+cup_board = st.number_input("Cupboards", min_value=0, value=2)
+floor = st.number_input("Floor", min_value=0, value=3)
+total_floor = st.number_input("Total Floors", min_value=1, value=4)
+balconies = st.number_input("Balconies", min_value=0, value=2)
+negotiable = st.checkbox("Negotiable", value=True)
+
+# --- Prepare user DataFrame ---
+year = activation_date.year
+month = activation_date.month
+day = activation_date.day
+
+input_dict = {
+    'City': city,
+    'Area Type': area_type,
+    'BHK': bhk,
+    'Size': size,
+    'Furnishing Status': furnishing,
+    'Tenant Preferred': tenant,
+    'Bathroom': bathroom,
+    'Year': year,
+    'Month': month,
+    'Day': day,
+    'Property Age': property_age,
+    'Cupboard': cup_board,
+    'Floor': floor,
+    'Total Floor': total_floor,
+    'Balconies': balconies,
+    'Negotiable': 1 if negotiable else 0,
+    # Main amenities
+    'Gym': amenities_dict['GYM'],
+    'Lift': amenities_dict['LIFT'],
+    'Swimming Pool': amenities_dict['POOL']
+}
+
+input_df = pd.DataFrame([input_dict])
+
+# --- Encode categorical features dynamically ---
+cat_cols = ['City', 'Area Type', 'Furnishing Status', 'Tenant Preferred']
+for col in cat_cols:
+    if col in input_df.columns and col in label_encoders:
+        le = label_encoders[col]
+        # Map unknown categories to -1 dynamically
+        input_df[col] = input_df[col].apply(lambda x: x if x in le.classes_ else '___UNKNOWN___')
+        # Temporarily extend encoder classes to handle unknown
+        if '___UNKNOWN___' not in le.classes_:
+            le.classes_ = list(le.classes_) + ['___UNKNOWN___']
+        input_df[col] = le.transform(input_df[col])
+
+# --- Scale numeric features ---
 num_cols = scaler.feature_names_in_
 for col in num_cols:
     if col not in input_df.columns:
         input_df[col] = 0
 input_df[num_cols] = scaler.transform(input_df[num_cols])
 
-# Ensure columns match model
+# --- Ensure all columns match model ---
 model_cols = model.feature_names_in_
 for col in model_cols:
     if col not in input_df.columns:
         input_df[col] = 0
-input_df = input_df[model_cols]  # reorder
+input_df = input_df[model_cols]
 
-# Predict
+# --- Predict ---
 if st.button("Predict Rent"):
     try:
         pred = model.predict(input_df)
