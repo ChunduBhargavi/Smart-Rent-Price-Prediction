@@ -51,4 +51,71 @@ numeric_defaults = {
 }
 
 for col, default in numeric_defaults.items():
-    user_inputs[col] = st.numb_
+    user_inputs[col] = st.number_input(col.replace("_", " "), min_value=0, value=default)
+
+# Negotiable
+user_inputs['Negotiable'] = 1 if st.checkbox("Negotiable", value=True) else 0
+
+# --- All amenities (always shown) ---
+all_amenities = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL',
+                 'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH',
+                 'STP', 'HK', 'PB', 'VP']
+
+st.subheader("Amenities")
+selected_amenities = {}
+for amen in all_amenities:
+    selected_amenities[amen] = 1 if st.checkbox(amen, value=False) else 0
+
+# --- Prepare DataFrame ---
+year = activation_date.year
+month = activation_date.month
+day = activation_date.day
+user_inputs['Year'] = year
+user_inputs['Month'] = month
+user_inputs['Day'] = day
+
+# Merge user inputs and amenities
+input_df = pd.DataFrame([user_inputs])
+# Only include amenities that exist in model
+model_amenities = [col for col in model.feature_names_in_ if col in all_amenities]
+amenities_df = pd.DataFrame([{k: v for k, v in selected_amenities.items() if k in model_amenities}])
+input_df = pd.concat([input_df, amenities_df], axis=1)
+
+# --- Encode categorical features ---
+for col in encoder_keys:
+    le = label_encoders[col]
+    input_df[col] = le.transform(input_df[col])
+
+# --- Scale numeric columns ---
+num_cols = scaler.feature_names_in_
+for col in num_cols:
+    if col not in input_df.columns:
+        input_df[col] = numeric_defaults.get(col, 0)
+input_df[num_cols] = scaler.transform(input_df[num_cols])
+
+# --- Ensure model column order ---
+model_cols = model.feature_names_in_
+for col in model_cols:
+    if col not in input_df.columns:
+        input_df[col] = 0
+input_df = input_df[model_cols]
+
+# --- Debug: show model input (optional) ---
+st.subheader("Debug: Model input features")
+st.dataframe(input_df)
+
+# --- Predict ---
+if st.button("Predict Rent"):
+    try:
+        pred = model.predict(input_df)
+        
+        # --- Handle log-transform if needed ---
+        if hasattr(model, 'log_transform') and model.log_transform:
+            pred = np.exp(pred)
+        
+        # Clamp negative predictions to a realistic minimum
+        pred = [max(1000, p) for p in pred]
+        
+        st.success(f"Predicted Monthly Rent: ₹{pred[0]:,.2f}")
+    except Exception as e:
+        st.error(f"Prediction failed: {e}")
