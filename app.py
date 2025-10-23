@@ -56,13 +56,15 @@ for col, default in numeric_defaults.items():
 # Negotiable
 user_inputs['Negotiable'] = 1 if st.checkbox("Negotiable", value=True) else 0
 
-# Amenities (dynamic)
-amenities_list = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL',
-                  'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH',
-                  'STP', 'HK', 'PB', 'VP']
+# --- Amenities: only show amenities used in the model ---
+all_possible_amenities = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL',
+                          'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH',
+                          'STP', 'HK', 'PB', 'VP']
+
+model_amenities = [col for col in model.feature_names_in_ if col in all_possible_amenities]
 
 st.subheader("Amenities")
-for amen in amenities_list:
+for amen in model_amenities:
     user_inputs[amen] = 1 if st.checkbox(amen, value=False) else 0
 
 # --- Prepare DataFrame ---
@@ -84,7 +86,6 @@ for col in encoder_keys:
 num_cols = scaler.feature_names_in_
 for col in num_cols:
     if col not in input_df.columns:
-        # Use realistic default if numeric column missing
         input_df[col] = numeric_defaults.get(col, 0)
 input_df[num_cols] = scaler.transform(input_df[num_cols])
 
@@ -95,7 +96,7 @@ for col in model_cols:
         input_df[col] = 0
 input_df = input_df[model_cols]
 
-# --- Debug: show input to model ---
+# --- Debug: show model input ---
 st.subheader("Debug: Model input features")
 st.dataframe(input_df)
 
@@ -108,7 +109,7 @@ if st.button("Predict Rent"):
         if hasattr(model, 'log_transform') and model.log_transform:
             pred = np.exp(pred)
         
-        # Clamp negative predictions to a minimum realistic rent (e.g., 1000)
+        # Clamp negative predictions to a realistic minimum rent
         pred = [max(1000, p) for p in pred]
         
         st.success(f"Predicted Monthly Rent: ₹{pred[0]:,.2f}")
