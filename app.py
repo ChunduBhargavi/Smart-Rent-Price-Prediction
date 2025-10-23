@@ -24,7 +24,7 @@ model, label_encoders, scaler = load_model_objects()
 
 # --- Streamlit UI ---
 st.title("Smart Rent Price Prediction")
-st.write("Enter property details to predict monthly rent dynamically.")
+st.write("Enter property details and click 'Predict Rent' to get the value according to your selection.")
 
 # --- Categorical inputs ---
 encoder_keys = list(label_encoders.keys())
@@ -34,7 +34,7 @@ for col in encoder_keys:
     classes = label_encoders[col].classes_
     user_inputs[col] = st.selectbox(col.replace("_", " ").title(), classes)
 
-# --- Numeric inputs with defaults ---
+# --- Numeric inputs ---
 numeric_defaults = {
     'BHK': 2,
     'Size': 1000,
@@ -58,41 +58,40 @@ user_inputs['Year'] = activation_date.year
 user_inputs['Month'] = activation_date.month
 user_inputs['Day'] = activation_date.day
 
-# --- Prepare DataFrame for prediction ---
-input_df = pd.DataFrame([user_inputs])
+# --- Prepare input for model ---
+def prepare_input_df():
+    df = pd.DataFrame([user_inputs])
+    
+    # Encode categorical columns
+    for col in encoder_keys:
+        df[col] = label_encoders[col].transform(df[col])
+    
+    # Scale numeric columns
+    for col in scaler.feature_names_in_:
+        if col not in df.columns:
+            df[col] = numeric_defaults.get(col, 0)
+    df[scaler.feature_names_in_] = scaler.transform(df[scaler.feature_names_in_])
+    
+    # Align columns with model
+    for col in model.feature_names_in_:
+        if col not in df.columns:
+            df[col] = 0
+    df = df[model.feature_names_in_]
+    return df
 
-# --- Encode categorical variables ---
-for col in encoder_keys:
-    le = label_encoders[col]
-    input_df[col] = le.transform(input_df[col])
-
-# --- Scale numeric columns ---
-for col in scaler.feature_names_in_:
-    if col not in input_df.columns:
-        input_df[col] = numeric_defaults.get(col, 0)
-input_df[scaler.feature_names_in_] = scaler.transform(input_df[scaler.feature_names_in_])
-
-# --- Align input columns with model ---
-for col in model.feature_names_in_:
-    if col not in input_df.columns:
-        input_df[col] = 0
-input_df = input_df[model.feature_names_in_]
-
-# --- Dynamic Prediction ---
-# Using a function so prediction updates whenever inputs change
-def predict_rent(df):
+# --- Predict rent when button is clicked ---
+if st.button("Predict Rent"):
+    input_df = prepare_input_df()
     try:
-        pred = model.predict(df)
-        # Handle log-transform if model was trained on log(rent)
+        pred = model.predict(input_df)
+        
+        # If model was trained on log(rent), convert back
         if hasattr(model, 'log_transform') and model.log_transform:
             pred = np.exp(pred)
-        # Clamp very low predictions
-        pred = [max(1000, p) for p in pred]
-        return pred[0]
+        
+        # Round prediction for display
+        pred_value = round(pred[0])
+        
+        st.success(f"Predicted Monthly Rent: ₹{pred_value:,}")
     except Exception as e:
         st.error(f"Prediction failed: {e}")
-        return None
-
-predicted_rent = predict_rent(input_df)
-if predicted_rent is not None:
-    st.success(f"Predicted Monthly Rent: ₹{predicted_rent:,.2f}")
