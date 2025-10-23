@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import pickle
 from datetime import datetime
 
@@ -49,7 +48,7 @@ with st.form(key='rental_form'):
     water_supply = st.selectbox("Water Supply", water_supply_options)
     building_type = st.selectbox("Building Type", building_type_options)
     
-    # Numerical
+    # Numeric/Boolean
     property_size = st.number_input("Property Size (sq ft)", min_value=100, value=1400)
     property_age = st.number_input("Property Age (years)", min_value=0, value=4)
     bathroom = st.number_input("Bathrooms", min_value=1, value=2)
@@ -68,18 +67,17 @@ with st.form(key='rental_form'):
     submit = st.form_submit_button("Predict Rental Price")
 
 if submit:
-    # Extract date parts
+    # --- Prepare user DataFrame ---
     year = activation_date.year
     month = activation_date.month
     day = activation_date.day
     
-    # --- Build user DataFrame ---
     user_dict = {
         'month': month,
         'day': day,
         'year': year,
-        'latitude': latitude,
-        'longitude': longitude,
+        'latitude': float(latitude),
+        'longitude': float(longitude),
         'type': type_,
         'lease_type': lease_type,
         'furnishing': furnishing,
@@ -87,13 +85,13 @@ if submit:
         'facing': facing,
         'water_supply': water_supply,
         'building_type': building_type,
-        'property_size': property_size,
-        'property_age': property_age,
-        'bathroom': bathroom,
-        'cup_board': cup_board,
-        'floor': floor,
-        'total_floor': total_floor,
-        'balconies': balconies,
+        'property_size': float(property_size),
+        'property_age': float(property_age),
+        'bathroom': float(bathroom),
+        'cup_board': float(cup_board),
+        'floor': float(floor),
+        'total_floor': float(total_floor),
+        'balconies': float(balconies),
         'negotiable': 1 if negotiable else 0,
         # main amenities
         'gym': amenities_dict['GYM'],
@@ -109,9 +107,9 @@ if submit:
         try:
             user_df[[col]] = encoder.transform(user_df[[col]])
         except ValueError:
-            user_df[col] = -1  # fallback for unseen category
+            user_df[col] = -1  # fallback for unknown categories
     
-    # --- Add remaining amenities avoiding duplicates ---
+    # --- Add remaining amenities without duplicates ---
     for amen in amenities_list:
         col_name = amen.lower()
         if col_name not in ['gym', 'lift', 'swimming_pool']:
@@ -122,7 +120,6 @@ if submit:
     for col in model_cols:
         if col not in user_df.columns:
             user_df[col] = 0  # default value
-    
     user_df = user_df[model_cols]  # reorder
     
     # --- Predict ---
