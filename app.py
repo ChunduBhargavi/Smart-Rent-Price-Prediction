@@ -65,32 +65,46 @@ def prepare_input_df():
     # Encode categorical columns
     for col in encoder_keys:
         le = label_encoders[col]
-        df[col] = le.transform(df[col])
+        try:
+            df[col] = le.transform(df[col])
+        except:
+            df[col] = 0  # fallback for unseen categories
     
-    # Scale numeric columns
+    # Fill missing numeric columns
     for col in scaler.feature_names_in_:
         if col not in df.columns:
             df[col] = numeric_defaults.get(col, 0)
+    
+    # Scale numeric columns
     df[scaler.feature_names_in_] = scaler.transform(df[scaler.feature_names_in_])
     
-    # Align columns with model
+    # Ensure all model columns exist
     for col in model.feature_names_in_:
         if col not in df.columns:
             df[col] = 0
     df = df[model.feature_names_in_]
+    
     return df
 
 # --- Predict rent on button click ---
 if st.button("Predict Rent"):
     input_df = prepare_input_df()
+    
+    # Optional: show input vector for debugging
+    # st.subheader("Input Vector")
+    # st.dataframe(input_df)
+    
     try:
-        # Predict (model may be trained on log(rent))
         pred_log = model.predict(input_df)
-        pred_rent = np.exp(pred_log)  # Convert back from log
         
-        # Round prediction for display
+        # Convert back if model was trained on log(rent)
+        if hasattr(model, 'log_transform') and model.log_transform:
+            pred_rent = np.exp(pred_log)
+        else:
+            pred_rent = pred_log
+        
         pred_value = round(pred_rent[0])
-        
         st.success(f"Predicted Monthly Rent: ₹{pred_value:,}")
+        
     except Exception as e:
         st.error(f"Prediction failed: {e}")
