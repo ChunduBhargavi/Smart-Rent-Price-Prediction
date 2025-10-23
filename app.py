@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 import numpy as np
 
-# --- Load model, label encoders, and scaler ---
+# --- Load model, encoders, scaler ---
 @st.cache_resource
 def load_model_objects():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,15 +26,14 @@ model, label_encoders, scaler = load_model_objects()
 st.title("Smart Rent Price Prediction")
 st.write("Enter property details and click 'Predict Rent'.")
 
-# --- Categorical inputs ---
+# --- Categorical Inputs ---
 encoder_keys = list(label_encoders.keys())
 user_inputs = {}
-
 for col in encoder_keys:
     classes = label_encoders[col].classes_
     user_inputs[col] = st.selectbox(col.replace("_", " ").title(), classes)
 
-# --- Numeric inputs ---
+# --- Numeric Inputs ---
 numeric_defaults = {
     'BHK': 2,
     'Size': 1000,
@@ -45,11 +44,10 @@ numeric_defaults = {
     'Total Floor': 4,
     'Balconies': 2
 }
-
 for col, default in numeric_defaults.items():
     user_inputs[col] = st.number_input(col.replace("_", " "), min_value=0, value=default)
 
-# Negotiable checkbox
+# Negotiable
 user_inputs['Negotiable'] = 1 if st.checkbox("Negotiable", value=True) else 0
 
 # Activation date
@@ -62,45 +60,38 @@ user_inputs['Day'] = activation_date.day
 def prepare_input_df():
     df = pd.DataFrame([user_inputs])
     
-    # Encode categorical columns
+    # Encode categoricals
     for col in encoder_keys:
         le = label_encoders[col]
         try:
             df[col] = le.transform(df[col])
         except:
-            df[col] = 0  # fallback for unseen categories
+            df[col] = 0  # fallback
     
     # Fill missing numeric columns
     for col in scaler.feature_names_in_:
         if col not in df.columns:
             df[col] = numeric_defaults.get(col, 0)
     
-    # Scale numeric columns
+    # Scale numeric
     df[scaler.feature_names_in_] = scaler.transform(df[scaler.feature_names_in_])
     
-    # Ensure all model columns exist
+    # Align with model columns
     for col in model.feature_names_in_:
         if col not in df.columns:
             df[col] = 0
     df = df[model.feature_names_in_]
-    
     return df
 
-# --- Predict rent on button click ---
+# --- Predict Rent on button click ---
 if st.button("Predict Rent"):
     input_df = prepare_input_df()
     try:
-        pred_log = model.predict(input_df)
-        
-        # --- Inverse transformation ---
-        # Use log1p if model was trained with np.log1p
-        pred_rent = np.expm1(pred_log)  # OR np.exp(pred_log) if log(y)
-        
-        # Prevent negative values
-        pred_rent = np.maximum(pred_rent, 0)
+        pred_log1p = model.predict(input_df)  # Model trained on log1p(rent)
+        pred_rent = np.expm1(pred_log1p)      # Convert back from log1p
+        pred_rent = np.maximum(pred_rent, 0)  # Avoid negative due to numeric error
         
         pred_value = round(pred_rent[0])
         st.success(f"Predicted Monthly Rent: ₹{pred_value:,}")
-        
     except Exception as e:
         st.error(f"Prediction failed: {e}")
