@@ -93,9 +93,6 @@ if st.button("Predict Rent"):
         # Convert back from log1p
         pred_rent = np.expm1(pred_log1p)
         
-        # Clip to minimum rent (avoid 0 or negative)
-        pred_rent = np.maximum(pred_rent, 10000)  # Minimum rent ₹100
-        
         # Round for display
         pred_value = round(pred_rent[0])
         
