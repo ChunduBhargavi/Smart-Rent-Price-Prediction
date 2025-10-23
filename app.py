@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 import numpy as np
 
-# --- Load model, encoders, and scaler ---
+# --- Load model, label encoders, and scaler ---
 @st.cache_resource
 def load_model_objects():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -92,10 +92,6 @@ for col in model.feature_names_in_:
     if col not in input_df.columns:
         input_df[col] = 0
 input_df = input_df[model.feature_names_in_]
-
-# --- Debug: show input features ---
-st.subheader("Debug: Model Input Features")
-st.dataframe(input_df)
 
 # --- Predict Rent ---
 if st.button("Predict Rent"):
