@@ -27,23 +27,16 @@ st.write("Enter property details below to predict the monthly rent.")
 
 # User inputs
 activation_date = st.date_input("Activation Date", value=datetime.today())
-city = st.text_input("City Name", "Bangalore")
-area_type = st.selectbox("Area Type", ["Super Area", "Carpet Area", "Built Area"])
+
+# --- Categorical inputs only from known encoder categories ---
+city = st.selectbox("City Name", label_encoders['City'].classes_)
+area_type = st.selectbox("Area Type", label_encoders['Area Type'].classes_)
+furnishing = st.selectbox("Furnishing Status", label_encoders['Furnishing Status'].classes_)
+tenant = st.selectbox("Tenant Preferred", label_encoders['Tenant Preferred'].classes_)
+
 bhk = st.number_input("BHK (Bedrooms)", 1, 10, 2)
 size = st.number_input("Size (sq.ft)", 100, 5000, 1000)
-furnishing = st.selectbox("Furnishing Status", ["Furnished", "Semi-Furnished", "Unfurnished"])
-tenant = st.selectbox("Tenant Preferred", ["Bachelors", "Family", "Company"])
 bathroom = st.number_input("Number of Bathrooms", 1, 5, 2)
-
-# Amenities list
-amenities_list = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL',
-                  'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH',
-                  'STP', 'HK', 'PB', 'VP']
-
-st.subheader("Amenities")
-amenities_dict = {}
-for amen in amenities_list:
-    amenities_dict[amen] = 1 if st.checkbox(amen, value=False) else 0
 
 # Other numeric inputs
 property_age = st.number_input("Property Age (years)", min_value=0, value=4)
@@ -53,7 +46,17 @@ total_floor = st.number_input("Total Floors", min_value=1, value=4)
 balconies = st.number_input("Balconies", min_value=0, value=2)
 negotiable = st.checkbox("Negotiable", value=True)
 
-# --- Prepare user DataFrame ---
+# Amenities
+amenities_list = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL',
+                  'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH',
+                  'STP', 'HK', 'PB', 'VP']
+
+st.subheader("Amenities")
+amenities_dict = {}
+for amen in amenities_list:
+    amenities_dict[amen] = 1 if st.checkbox(amen, value=False) else 0
+
+# --- Prepare input DataFrame ---
 year = activation_date.year
 month = activation_date.month
 day = activation_date.day
@@ -75,7 +78,7 @@ input_dict = {
     'Total Floor': total_floor,
     'Balconies': balconies,
     'Negotiable': 1 if negotiable else 0,
-    # Main amenities
+    # main amenities
     'Gym': amenities_dict['GYM'],
     'Lift': amenities_dict['LIFT'],
     'Swimming Pool': amenities_dict['POOL']
@@ -83,26 +86,20 @@ input_dict = {
 
 input_df = pd.DataFrame([input_dict])
 
-# --- Encode categorical features dynamically ---
+# --- Encode categorical features ---
 cat_cols = ['City', 'Area Type', 'Furnishing Status', 'Tenant Preferred']
 for col in cat_cols:
-    if col in input_df.columns and col in label_encoders:
-        le = label_encoders[col]
-        # Map unknown categories to -1 dynamically
-        input_df[col] = input_df[col].apply(lambda x: x if x in le.classes_ else '___UNKNOWN___')
-        # Temporarily extend encoder classes to handle unknown
-        if '___UNKNOWN___' not in le.classes_:
-            le.classes_ = list(le.classes_) + ['___UNKNOWN___']
-        input_df[col] = le.transform(input_df[col])
+    le = label_encoders[col]
+    input_df[col] = le.transform(input_df[col])
 
-# --- Scale numeric features ---
+# --- Scale numeric columns ---
 num_cols = scaler.feature_names_in_
 for col in num_cols:
     if col not in input_df.columns:
         input_df[col] = 0
 input_df[num_cols] = scaler.transform(input_df[num_cols])
 
-# --- Ensure all columns match model ---
+# --- Ensure model columns order ---
 model_cols = model.feature_names_in_
 for col in model_cols:
     if col not in input_df.columns:
