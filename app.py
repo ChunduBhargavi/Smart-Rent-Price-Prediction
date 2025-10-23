@@ -103,7 +103,7 @@ if st.button("Predict Rent"):
             pred = np.exp(pred)
         
         # Clamp very low predictions
-        pred = [max(1000, p) for p in pred]
+        pred = [max(10000, p) for p in pred]
         
         st.success(f"Predicted Monthly Rent: ₹{pred[0]:,.2f}")
     except Exception as e:
