@@ -25,26 +25,36 @@ model, label_encoders, scaler = load_model_objects()
 st.title("Smart Rent Price Prediction")
 st.write("Enter property details below to predict the monthly rent.")
 
-# User inputs
+# --- Identify actual encoder keys ---
+encoder_keys = list(label_encoders.keys())
+st.write(f"Detected categorical columns: {encoder_keys}")  # optional debug
+
+# --- User inputs ---
 activation_date = st.date_input("Activation Date", value=datetime.today())
 
-# --- Categorical inputs only from known encoder categories ---
-city = st.selectbox("City Name", label_encoders['City'].classes_)
-area_type = st.selectbox("Area Type", label_encoders['Area Type'].classes_)
-furnishing = st.selectbox("Furnishing Status", label_encoders['Furnishing Status'].classes_)
-tenant = st.selectbox("Tenant Preferred", label_encoders['Tenant Preferred'].classes_)
+# Use encoder keys to create selectboxes dynamically
+user_inputs = {}
+for col in encoder_keys:
+    classes = label_encoders[col].classes_
+    user_inputs[col] = st.selectbox(col.replace("_", " ").title(), classes)
 
-bhk = st.number_input("BHK (Bedrooms)", 1, 10, 2)
-size = st.number_input("Size (sq.ft)", 100, 5000, 1000)
-bathroom = st.number_input("Number of Bathrooms", 1, 5, 2)
+# Numeric inputs
+numeric_cols_defaults = {
+    'BHK': 2,
+    'Size': 1000,
+    'Bathroom': 2,
+    'Property Age': 4,
+    'Cupboard': 2,
+    'Floor': 3,
+    'Total Floor': 4,
+    'Balconies': 2
+}
 
-# Other numeric inputs
-property_age = st.number_input("Property Age (years)", min_value=0, value=4)
-cup_board = st.number_input("Cupboards", min_value=0, value=2)
-floor = st.number_input("Floor", min_value=0, value=3)
-total_floor = st.number_input("Total Floors", min_value=1, value=4)
-balconies = st.number_input("Balconies", min_value=0, value=2)
-negotiable = st.checkbox("Negotiable", value=True)
+for col, default in numeric_cols_defaults.items():
+    user_inputs[col] = st.number_input(col.replace("_", " "), min_value=0, value=default)
+
+# Negotiable
+user_inputs['Negotiable'] = 1 if st.checkbox("Negotiable", value=True) else 0
 
 # Amenities
 amenities_list = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL',
@@ -52,43 +62,22 @@ amenities_list = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL',
                   'STP', 'HK', 'PB', 'VP']
 
 st.subheader("Amenities")
-amenities_dict = {}
 for amen in amenities_list:
-    amenities_dict[amen] = 1 if st.checkbox(amen, value=False) else 0
+    user_inputs[amen] = 1 if st.checkbox(amen, value=False) else 0
 
-# --- Prepare input DataFrame ---
+# --- Prepare DataFrame ---
 year = activation_date.year
 month = activation_date.month
 day = activation_date.day
 
-input_dict = {
-    'City': city,
-    'Area Type': area_type,
-    'BHK': bhk,
-    'Size': size,
-    'Furnishing Status': furnishing,
-    'Tenant Preferred': tenant,
-    'Bathroom': bathroom,
-    'Year': year,
-    'Month': month,
-    'Day': day,
-    'Property Age': property_age,
-    'Cupboard': cup_board,
-    'Floor': floor,
-    'Total Floor': total_floor,
-    'Balconies': balconies,
-    'Negotiable': 1 if negotiable else 0,
-    # main amenities
-    'Gym': amenities_dict['GYM'],
-    'Lift': amenities_dict['LIFT'],
-    'Swimming Pool': amenities_dict['POOL']
-}
+user_inputs['Year'] = year
+user_inputs['Month'] = month
+user_inputs['Day'] = day
 
-input_df = pd.DataFrame([input_dict])
+input_df = pd.DataFrame([user_inputs])
 
 # --- Encode categorical features ---
-cat_cols = ['City', 'Area Type', 'Furnishing Status', 'Tenant Preferred']
-for col in cat_cols:
+for col in encoder_keys:
     le = label_encoders[col]
     input_df[col] = le.transform(input_df[col])
 
