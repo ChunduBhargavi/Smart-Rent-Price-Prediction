@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 import numpy as np
 
-# --- Load model, label encoders, and scaler ---
+# --- Load model, encoders, and scaler ---
 @st.cache_resource
 def load_model_objects():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -24,9 +24,9 @@ model, label_encoders, scaler = load_model_objects()
 
 # --- Streamlit UI ---
 st.title("Smart Rent Price Prediction")
-st.write("Enter property details to predict the monthly rent.")
+st.write("Enter property details to predict monthly rent.")
 
-# --- Categorical Inputs ---
+# --- Categorical inputs ---
 encoder_keys = list(label_encoders.keys())
 user_inputs = {}
 
@@ -34,7 +34,7 @@ for col in encoder_keys:
     classes = label_encoders[col].classes_
     user_inputs[col] = st.selectbox(col.replace("_", " ").title(), classes)
 
-# --- Numeric Inputs with realistic defaults ---
+# --- Numeric inputs with defaults ---
 numeric_defaults = {
     'BHK': 2,
     'Size': 1000,
@@ -49,7 +49,7 @@ numeric_defaults = {
 for col, default in numeric_defaults.items():
     user_inputs[col] = st.number_input(col.replace("_", " "), min_value=0, value=default)
 
-# Negotiable
+# Negotiable checkbox
 user_inputs['Negotiable'] = 1 if st.checkbox("Negotiable", value=True) else 0
 
 # Activation date
@@ -58,7 +58,7 @@ user_inputs['Year'] = activation_date.year
 user_inputs['Month'] = activation_date.month
 user_inputs['Day'] = activation_date.day
 
-# --- Amenities (all shown, only model-relevant passed) ---
+# --- Amenities ---
 all_amenities = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL',
                  'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH',
                  'STP', 'HK', 'PB', 'VP']
@@ -68,15 +68,15 @@ selected_amenities = {}
 for amen in all_amenities:
     selected_amenities[amen] = 1 if st.checkbox(amen, value=False) else 0
 
-# --- Prepare input DataFrame ---
+# --- Prepare DataFrame ---
 input_df = pd.DataFrame([user_inputs])
 
-# Only pass amenities that exist in model features
-model_amenities = [col for col in all_amenities if col in model.feature_names_in_]
+# Only include amenities that exist in model features
+model_amenities = [a for a in all_amenities if a in model.feature_names_in_]
 amenities_df = pd.DataFrame([{k: v for k, v in selected_amenities.items() if k in model_amenities}])
 input_df = pd.concat([input_df, amenities_df], axis=1)
 
-# --- Encode categorical features ---
+# --- Encode categorical variables ---
 for col in encoder_keys:
     le = label_encoders[col]
     input_df[col] = le.transform(input_df[col])
@@ -87,22 +87,26 @@ for col in scaler.feature_names_in_:
         input_df[col] = numeric_defaults.get(col, 0)
 input_df[scaler.feature_names_in_] = scaler.transform(input_df[scaler.feature_names_in_])
 
-# --- Ensure column order matches model ---
+# --- Align input columns with model ---
 for col in model.feature_names_in_:
     if col not in input_df.columns:
         input_df[col] = 0
 input_df = input_df[model.feature_names_in_]
+
+# --- Debug: show input features ---
+st.subheader("Debug: Model Input Features")
+st.dataframe(input_df)
 
 # --- Predict Rent ---
 if st.button("Predict Rent"):
     try:
         pred = model.predict(input_df)
         
-        # Handle log-transform if model was trained on log(rent)
+        # Handle log-transform if needed
         if hasattr(model, 'log_transform') and model.log_transform:
             pred = np.exp(pred)
         
-        # Clamp negative or very low rents
+        # Clamp very low predictions
         pred = [max(1000, p) for p in pred]
         
         st.success(f"Predicted Monthly Rent: ₹{pred[0]:,.2f}")
