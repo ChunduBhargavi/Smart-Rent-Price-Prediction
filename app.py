@@ -58,23 +58,8 @@ user_inputs['Year'] = activation_date.year
 user_inputs['Month'] = activation_date.month
 user_inputs['Day'] = activation_date.day
 
-# --- Amenities ---
-all_amenities = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL',
-                 'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH',
-                 'STP', 'HK', 'PB', 'VP']
-
-st.subheader("Amenities")
-selected_amenities = {}
-for amen in all_amenities:
-    selected_amenities[amen] = 1 if st.checkbox(amen, value=False) else 0
-
 # --- Prepare DataFrame ---
 input_df = pd.DataFrame([user_inputs])
-
-# Only include amenities that exist in model features
-model_amenities = [a for a in all_amenities if a in model.feature_names_in_]
-amenities_df = pd.DataFrame([{k: v for k, v in selected_amenities.items() if k in model_amenities}])
-input_df = pd.concat([input_df, amenities_df], axis=1)
 
 # --- Encode categorical variables ---
 for col in encoder_keys:
@@ -103,7 +88,7 @@ if st.button("Predict Rent"):
             pred = np.exp(pred)
         
         # Clamp very low predictions
-        pred = [max(10000, p) for p in pred]
+        pred = [max(1000, p) for p in pred]
         
         st.success(f"Predicted Monthly Rent: ₹{pred[0]:,.2f}")
     except Exception as e:
