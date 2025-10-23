@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 from datetime import datetime
 
-# Load model and encoder
+# --- Load model and encoder ---
 @st.cache_resource
 def load_model_and_encoder():
     with open('regression_model.pkl', 'rb') as f:
@@ -15,7 +15,7 @@ def load_model_and_encoder():
 
 model, encoder = load_model_and_encoder()
 
-# Predefined categories (based on notebook uniques; adjust if needed)
+# --- Predefined categories ---
 type_options = ['BHK1', 'BHK2', 'BHK3', 'BHK4', 'BHK4PLUS', 'RK1', 'PENTHOUSE']
 lease_type_options = ['ANYONE', 'FAMILY', 'BACHELOR', 'COMPANY']
 furnishing_options = ['SEMI_FURNISHED', 'FULLY_FURNISHED', 'NOT_FURNISHED']
@@ -24,18 +24,19 @@ facing_options = ['E', 'NE', 'N', 'SE', 'NW', 'S', 'W', 'SW']
 water_supply_options = ['CORP_BORE', 'CORPORATION', 'BOREWELL']
 building_type_options = ['AP', 'IF', 'IH', 'GC']
 
-# Amenities list
-amenities_list = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL', 'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH', 'STP', 'HK', 'PB', 'VP']
+# --- Amenities list ---
+amenities_list = ['LIFT', 'GYM', 'INTERNET', 'AC', 'CLUB', 'INTERCOM', 'POOL', 
+                  'CPA', 'FS', 'SERVANT', 'SECURITY', 'SC', 'GP', 'PARK', 'RWH', 
+                  'STP', 'HK', 'PB', 'VP']
 
-# Streamlit app
+# --- Streamlit app ---
 st.title("Rental Property Price Predictor")
 
-# Form for inputs
 with st.form(key='rental_form'):
     # Date
     activation_date = st.date_input("Activation Date", value=datetime.today())
     
-    # Location (lat/long)
+    # Location
     latitude = st.number_input("Latitude", value=12.93, format="%.6f")
     longitude = st.number_input("Longitude", value=77.67, format="%.6f")
     
@@ -48,7 +49,7 @@ with st.form(key='rental_form'):
     water_supply = st.selectbox("Water Supply", water_supply_options)
     building_type = st.selectbox("Building Type", building_type_options)
     
-    # Numerical/Bool
+    # Numerical
     property_size = st.number_input("Property Size (sq ft)", min_value=100, value=1400)
     property_age = st.number_input("Property Age (years)", min_value=0, value=4)
     bathroom = st.number_input("Bathrooms", min_value=1, value=2)
@@ -58,7 +59,7 @@ with st.form(key='rental_form'):
     balconies = st.number_input("Balconies", min_value=0, value=2)
     negotiable = st.checkbox("Negotiable", value=True)
     
-    # Amenities checkboxes
+    # Amenities
     st.subheader("Amenities")
     amenities_dict = {}
     for amen in amenities_list:
@@ -72,7 +73,7 @@ if submit:
     month = activation_date.month
     day = activation_date.day
     
-    # Create user DataFrame (main features)
+    # --- Build user DataFrame ---
     user_dict = {
         'month': month,
         'day': day,
@@ -94,7 +95,7 @@ if submit:
         'total_floor': total_floor,
         'balconies': balconies,
         'negotiable': 1 if negotiable else 0,
-        # Set redundant bools based on amenities (to match notebook)
+        # main amenities
         'gym': amenities_dict['GYM'],
         'lift': amenities_dict['LIFT'],
         'swimming_pool': amenities_dict['POOL']
@@ -102,19 +103,31 @@ if submit:
     
     user_df = pd.DataFrame([user_dict])
     
-    # Encode categoricals
+    # --- Encode categorical features safely ---
     cat_cols = ['type', 'lease_type', 'furnishing', 'parking', 'facing', 'water_supply', 'building_type']
-    user_df[cat_cols] = encoder.transform(user_df[cat_cols])
+    for col in cat_cols:
+        try:
+            user_df[[col]] = encoder.transform(user_df[[col]])
+        except ValueError:
+            user_df[col] = -1  # fallback for unseen category
     
-    # Add amenities as columns
-    amenities_df = pd.DataFrame([amenities_dict])
-    user_df = pd.concat([user_df, amenities_df], axis=1)
+    # --- Add remaining amenities avoiding duplicates ---
+    for amen in amenities_list:
+        col_name = amen.lower()
+        if col_name not in ['gym', 'lift', 'swimming_pool']:
+            user_df[col_name] = amenities_dict[amen]
     
-    # Predict (assume column order matches training; if not, reorder to match x.columns)
-    prediction = model.predict(user_df)
+    # --- Ensure columns match model ---
+    model_cols = model.feature_names_in_
+    for col in model_cols:
+        if col not in user_df.columns:
+            user_df[col] = 0  # default value
     
-    st.success(f"Predicted Rental Price: ₹{prediction[0]:,.2f}")
+    user_df = user_df[model_cols]  # reorder
+    
+    # --- Predict ---
+    try:
+        prediction = model.predict(user_df)
+        st.success(f"Predicted Rental Price: ₹{prediction[0]:,.2f}")
     except Exception as e:
         st.error(f"Prediction failed: {e}")
-
-
