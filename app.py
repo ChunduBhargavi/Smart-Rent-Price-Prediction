@@ -103,7 +103,7 @@ if st.button("Predict Rent"):
         pred_rent = np.expm1(pred_log1p)
         
         # Clip very small negatives caused by numeric noise
-        pred_rent = np.clip(pred_rent,  None)
+        pred_rent = np.clip(pred_rent, 10000 ,None)
         
         pred_value = round(pred_rent[0])
         st.success(f"Predicted Monthly Rent: ₹{pred_value:,}")
