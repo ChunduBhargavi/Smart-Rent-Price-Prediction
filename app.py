@@ -87,11 +87,14 @@ def prepare_input_df():
 if st.button("Predict Rent"):
     input_df = prepare_input_df()
     try:
-        # Predict (model trained on log1p(rent))
+        # Predict log1p(rent)
         pred_log1p = model.predict(input_df)
         
-        # Convert back from log1p
+        # Convert back to actual rent
         pred_rent = np.expm1(pred_log1p)
+        
+        # Clip negative outputs from numeric noise
+        pred_rent = np.clip(pred_rent, 0, None)
         
         # Round for display
         pred_value = round(pred_rent[0])
