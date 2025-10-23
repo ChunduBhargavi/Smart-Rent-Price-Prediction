@@ -24,7 +24,7 @@ model, label_encoders, scaler = load_model_objects()
 
 # --- Streamlit UI ---
 st.title("Smart Rent Price Prediction")
-st.write("Enter property details and click 'Predict Rent' to get the value according to your selection.")
+st.write("Enter property details and click 'Predict Rent'.")
 
 # --- Categorical inputs ---
 encoder_keys = list(label_encoders.keys())
@@ -58,13 +58,14 @@ user_inputs['Year'] = activation_date.year
 user_inputs['Month'] = activation_date.month
 user_inputs['Day'] = activation_date.day
 
-# --- Prepare input for model ---
+# --- Prepare input DataFrame ---
 def prepare_input_df():
     df = pd.DataFrame([user_inputs])
     
     # Encode categorical columns
     for col in encoder_keys:
-        df[col] = label_encoders[col].transform(df[col])
+        le = label_encoders[col]
+        df[col] = le.transform(df[col])
     
     # Scale numeric columns
     for col in scaler.feature_names_in_:
@@ -79,18 +80,16 @@ def prepare_input_df():
     df = df[model.feature_names_in_]
     return df
 
-# --- Predict rent when button is clicked ---
+# --- Predict rent on button click ---
 if st.button("Predict Rent"):
     input_df = prepare_input_df()
     try:
-        pred = model.predict(input_df)
-        
-        # If model was trained on log(rent), convert back
-        if hasattr(model, 'log_transform') and model.log_transform:
-            pred = np.exp(pred)
+        # Predict (model may be trained on log(rent))
+        pred_log = model.predict(input_df)
+        pred_rent = np.exp(pred_log)  # Convert back from log
         
         # Round prediction for display
-        pred_value = round(pred[0])
+        pred_value = round(pred_rent[0])
         
         st.success(f"Predicted Monthly Rent: ₹{pred_value:,}")
     except Exception as e:
