@@ -89,19 +89,15 @@ def prepare_input_df():
 # --- Predict rent on button click ---
 if st.button("Predict Rent"):
     input_df = prepare_input_df()
-    
-    # Optional: show input vector for debugging
-    # st.subheader("Input Vector")
-    # st.dataframe(input_df)
-    
     try:
         pred_log = model.predict(input_df)
         
-        # Convert back if model was trained on log(rent)
-        if hasattr(model, 'log_transform') and model.log_transform:
-            pred_rent = np.exp(pred_log)
-        else:
-            pred_rent = pred_log
+        # --- Inverse transformation ---
+        # Use log1p if model was trained with np.log1p
+        pred_rent = np.expm1(pred_log)  # OR np.exp(pred_log) if log(y)
+        
+        # Prevent negative values
+        pred_rent = np.maximum(pred_rent, 0)
         
         pred_value = round(pred_rent[0])
         st.success(f"Predicted Monthly Rent: ₹{pred_value:,}")
