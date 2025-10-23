@@ -93,14 +93,19 @@ def prepare_input_df(inputs):
 # -------------------------
 if st.button("Predict Rent"):
     input_df = prepare_input_df(user_inputs)
+    
+    # Debug: see what the model actually receives
+    # st.write("Model Input:")
+    # st.dataframe(input_df)
+    
     try:
-        # Predict log1p if model trained on log-transformed rent
+        # Predict
         pred_log1p = model.predict(input_df)
         
-        # Convert back
+        # Convert from log1p if trained that way
         pred_rent = np.expm1(pred_log1p)
         
-        # Clip tiny negatives due to numeric errors
+        # Clip tiny negatives (avoid negative output)
         pred_rent = np.clip(pred_rent, 0, None)
         
         st.success(f"Predicted Monthly Rent: ₹{round(pred_rent[0]):,}")
