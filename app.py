@@ -102,7 +102,7 @@ if st.button("Predict Rent"):
         # Convert back from log1p
         pred_rent = np.expm1(pred_log1p)
         
-        # Clip tiny negative values caused by numeric noise
+        # Clip very small negatives caused by numeric noise
         pred_rent = np.clip(pred_rent, 0, None)
         
         pred_value = round(pred_rent[0])
