@@ -30,7 +30,7 @@ model, label_encoders, scaler = load_model_objects()
 st.title("Smart Rent Price Prediction")
 st.write("Enter property details and click 'Predict Rent'.")
 
-# --- Categorical Inputs ---
+# --- Categorical Inputs based on encoder classes ---
 encoder_keys = list(label_encoders.keys())
 user_inputs = {}
 for col in encoder_keys:
@@ -103,7 +103,7 @@ if st.button("Predict Rent"):
         pred_rent = np.expm1(pred_log1p)
         
         # Clip very small negatives caused by numeric noise
-        pred_rent = np.clip(pred_rent, 0, None)
+        pred_rent = np.clip(pred_rent, , None)
         
         pred_value = round(pred_rent[0])
         st.success(f"Predicted Monthly Rent: ₹{pred_value:,}")
