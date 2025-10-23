@@ -87,11 +87,18 @@ def prepare_input_df():
 if st.button("Predict Rent"):
     input_df = prepare_input_df()
     try:
-        pred_log1p = model.predict(input_df)  # Model trained on log1p(rent)
-        pred_rent = np.expm1(pred_log1p)      # Convert back from log1p
-        pred_rent = np.maximum(pred_rent, 0)  # Avoid negative due to numeric error
+        # Predict (model trained on log1p(rent))
+        pred_log1p = model.predict(input_df)
         
+        # Convert back from log1p
+        pred_rent = np.expm1(pred_log1p)
+        
+        # Clip to minimum rent (avoid 0 or negative)
+        pred_rent = np.maximum(pred_rent, 100)  # Minimum rent ₹100
+        
+        # Round for display
         pred_value = round(pred_rent[0])
+        
         st.success(f"Predicted Monthly Rent: ₹{pred_value:,}")
     except Exception as e:
         st.error(f"Prediction failed: {e}")
