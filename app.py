@@ -37,23 +37,17 @@ numeric_defaults = {
     'Balconies': 2
 }
 
-amenities_list = ['GYM', 'LIFT', 'POOL']
-
 # --- User Inputs ---
 with st.form(key='rental_form'):
-    # Categorical
     user_inputs = {}
+    
+    # Categorical
     for col in cat_cols:
         user_inputs[col] = st.selectbox(col.replace("_", " ").title(), encoder[col].classes_)
     
     # Numeric
     for col, default in numeric_defaults.items():
         user_inputs[col] = st.number_input(col.replace("_", " "), min_value=0, value=default)
-    
-    # Amenities
-    st.subheader("Amenities")
-    for amen in amenities_list:
-        user_inputs[amen.lower()] = 1 if st.checkbox(amen, value=False) else 0
     
     # Negotiable
     user_inputs['Negotiable'] = 1 if st.checkbox("Negotiable", value=True) else 0
@@ -64,7 +58,7 @@ with st.form(key='rental_form'):
     user_inputs['Month'] = activation_date.month
     user_inputs['Day'] = activation_date.day
     
-    submit = st.form_submit_button("Predict Rental Price")
+    submit = st.form_submit_button("Predict Rent")
 
 # -------------------------
 # Prepare input DataFrame and predict
@@ -103,7 +97,7 @@ if submit:
         pred_log1p = model.predict(input_df)
         # Convert from log1p if model uses it
         pred_rent = np.expm1(pred_log1p)
-        pred_rent = np.clip(pred_rent, 0, None)  # prevent negative/zero output
+        pred_rent = np.clip(pred_rent, 0, None)  # avoid negative/zero
         
         st.success(f"Predicted Monthly Rent: ₹{round(pred_rent[0]):,}")
     except Exception as e:
