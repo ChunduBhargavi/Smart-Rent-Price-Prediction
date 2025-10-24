@@ -19,13 +19,13 @@ model, encoder, scaler = load_model_objects()
 # -------------------------
 # Streamlit UI
 # -------------------------
-st.title("Smart Rent Price Prediction")
-st.write("Enter property details and click 'Predict Rent'.")
+st.title("🏠 Smart Rent Price Prediction")
+st.write("Fill in the property details below and click **Predict Rent** to estimate the monthly rent.")
 
-# Categorical columns
+# Categorical columns (loaded from encoder)
 cat_cols = list(encoder.keys())
 
-# Numeric defaults
+# Numeric default values
 numeric_defaults = {
     'BHK': 2,
     'Size': 1000,
@@ -41,24 +41,24 @@ numeric_defaults = {
 with st.form(key='rental_form'):
     user_inputs = {}
     
-    # Categorical
+    st.subheader("📍 Property Details")
     for col in cat_cols:
         user_inputs[col] = st.selectbox(col.replace("_", " ").title(), encoder[col].classes_)
-    
-    # Numeric
+
+    st.subheader("📏 Property Specifications")
     for col, default in numeric_defaults.items():
         user_inputs[col] = st.number_input(col.replace("_", " "), min_value=0, value=default)
     
-    # Negotiable
-    user_inputs['Negotiable'] = 1 if st.checkbox("Negotiable", value=True) else 0
+    st.subheader("💰 Pricing Options")
+    user_inputs['Negotiable'] = 1 if st.checkbox("Is the rent negotiable?", value=True) else 0
     
-    # Activation date
+    st.subheader("📅 Listing Date")
     activation_date = st.date_input("Activation Date", value=datetime.today())
     user_inputs['Year'] = activation_date.year
     user_inputs['Month'] = activation_date.month
     user_inputs['Day'] = activation_date.day
     
-    submit = st.form_submit_button("Predict Rent")
+    submit = st.form_submit_button("🔮 Predict Rent")
 
 # -------------------------
 # Prepare input DataFrame and predict
@@ -71,7 +71,7 @@ def prepare_input_df(inputs):
         try:
             df[col] = encoder[col].transform(df[col])
         except:
-            df[col] = 0  # fallback for unseen category
+            df[col] = 0  # fallback for unseen categories
     
     # Ensure numeric columns expected by scaler exist
     num_cols = scaler.feature_names_in_
@@ -90,15 +90,18 @@ def prepare_input_df(inputs):
     
     return df
 
+# -------------------------
+# Prediction
+# -------------------------
 if submit:
-    input_df = prepare_input_df(user_inputs)
-    
     try:
+        input_df = prepare_input_df(user_inputs)
         pred_log1p = model.predict(input_df)
-        # Convert from log1p if model uses it
-        pred_rent = np.expm1(pred_log1p)
-        pred_rent = np.clip(pred_rent, 10000, None)  # avoid negative/zero
         
-        st.success(f"Predicted Monthly Rent: ₹{round(pred_rent[0]):,}")
+        # Convert from log1p if model used it
+        pred_rent = np.expm1(pred_log1p)
+        pred_rent = np.clip(pred_rent, 10000, None)  # avoid negative or unrealistic rents
+        
+        st.success(f"🏡 **Predicted Monthly Rent:** ₹{round(pred_rent[0]):,}")
     except Exception as e:
         st.error(f"Prediction failed: {e}")
