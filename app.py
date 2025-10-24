@@ -19,7 +19,7 @@ model, encoder, scaler = load_model_objects()
 # -------------------------
 # Streamlit UI
 # -------------------------
-st.title("🏠 Smart Rent Price Prediction")
+st.title("Smart Rent Price Prediction")
 st.write("Fill in the property details below and click **Predict Rent** to estimate the monthly rent.")
 
 # Categorical columns (loaded from encoder)
@@ -41,24 +41,18 @@ numeric_defaults = {
 with st.form(key='rental_form'):
     user_inputs = {}
     
-    st.subheader("📍 Property Details")
     for col in cat_cols:
         user_inputs[col] = st.selectbox(col.replace("_", " ").title(), encoder[col].classes_)
-
-    st.subheader("📏 Property Specifications")
     for col, default in numeric_defaults.items():
         user_inputs[col] = st.number_input(col.replace("_", " "), min_value=0, value=default)
     
-    st.subheader("💰 Pricing Options")
-    user_inputs['Negotiable'] = 1 if st.checkbox("Is the rent negotiable?", value=True) else 0
-    
-    st.subheader("📅 Listing Date")
+    user_inputs['Negotiable'] = 1 if st.checkbox("Negotiable", value=True) else 0
     activation_date = st.date_input("Activation Date", value=datetime.today())
     user_inputs['Year'] = activation_date.year
     user_inputs['Month'] = activation_date.month
     user_inputs['Day'] = activation_date.day
     
-    submit = st.form_submit_button("🔮 Predict Rent")
+    submit = st.form_submit_button("Predict Rent")
 
 # -------------------------
 # Prepare input DataFrame and predict
@@ -97,11 +91,15 @@ if submit:
     try:
         input_df = prepare_input_df(user_inputs)
         pred_log1p = model.predict(input_df)
-        
-        # Convert from log1p if model used it
+
+        # If model output is in log1p scale, convert it back
         pred_rent = np.expm1(pred_log1p)
-        pred_rent = np.clip(pred_rent, 10000, None)  # avoid negative or unrealistic rents
-        
-        st.success(f"🏡 **Predicted Monthly Rent:** ₹{round(pred_rent[0]):,}")
+
+        # Ensure it's a clean, positive value
+        if np.isnan(pred_rent[0]) or pred_rent[0] <= 0:
+            st.warning("The predicted rent seems invalid. Please review your input details.")
+        else:
+            st.success(f"**Predicted Monthly Rent:** ₹{round(pred_rent[0]):,}")
+
     except Exception as e:
         st.error(f"Prediction failed: {e}")
